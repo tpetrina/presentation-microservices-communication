@@ -10,6 +10,7 @@ export const theme = nightOwl;
 # Information patterns for microservice architecture
 
 Toni Petrina <br/>
+Visma e-conomic <br/>
 Update Conference 2021, Prague
 
 </Layout>
@@ -57,6 +58,22 @@ function (model: CreateUserModel) {
 }
 ```
 
+```diff 2:6 subtitle="Original requirement"
+
+```
+
+```diff 8:9 subtitle="CRM integration added"
+
+```
+
+```diff 11:12 subtitle="New feature"
+
+```
+
+```diff 14:15 subtitle="New feature"
+
+```
+
 </CodeSurfer>
 
 ---
@@ -86,29 +103,19 @@ function (model: CreateUserModel) {
 
 <Layout style={{fontSize: '0.6em'}}>
 
-Microservices - also known as the microservice architecture - is an architectural style that structures an application as a collection of services that are
+Microservices [...] are
 
 - Highly maintainable and testable
-- Loosely coupled
+- <span style={{ color: "#e32636" }}>Loosely coupled</span>
 - Independently deployable
-- Organized around business capabilities
+- <span style={{ color: "#e32636" }}>
+    Organized around business capabilities
+  </span>
 - Owned by a small team
-
-The microservice architecture enables the rapid, frequent and reliable delivery of large, complex applications. It also enables an organization to evolve its technology stack.
 
 (from [microservices.io](https://microservices.io))
 
 </Layout>
-
----
-
-## Let's start with data...
-
-- Data is owned by a service
-- Well-defined API on the boundary
-  - This includes RPC/REST API, events published, consumed, ETL
-- Sharing schemas, not types
-- [Data on the Outside vs. Data on the Inside, Pat Helland](https://queue.acm.org/detail.cfm?id=3415014)
 
 ---
 
@@ -133,15 +140,6 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 ## Issues
 
-- What if one of the services is down?
-- Required vs optional
-- Latency increases with number of components
-- Orchestration is valid reason for sync communication
-
----
-
-## Request architecture
-
 <LocalImage src="images/request-driven-error.png" width="800px" />
 
 ---
@@ -152,29 +150,81 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 ---
 
-## Events come at a cost
-
-- Eventual consistency
-- Thundering herd and backpressure
-- Need for observability
-- Data requirements
-- Event design, versioning, granularity, domain leaking
+<blockquote>Always emit events with Outbox pattern</blockquote>
 
 ---
 
-## Eventual consistency
+<Layout>
+
+## 1. Eventual consistency
+
+Issues:
 
 - "User created, but can't login"
-- Data changed, but services are slow to catch-up
-- We can write to read model in the same transaction
+- Data changed, but UI doesn't reflect it
+
+Solve with:
+
+- Sync write to read model in the same transaction
+- Better UX (OK vs Accepted HTTP Status Code)
+- Learn to live with it
+
+</Layout>
 
 ---
 
-## Thundering herd and backpressure
+<Layout>
+
+## 2. Thundering herd and backpressure
 
 - Subscribers must handle the load from producer
   - Could you handle Twitter load on your service in real time?
 - [Thundering herds](https://en.wikipedia.org/wiki/Thundering_herd_problem)
+
+Solve with:
+
+- Backpressure and limiting on queue ingestion
+
+</Layout>
+
+---
+
+<Layout>
+
+## 3. Observability
+
+<LocalImage src="images/events-must-flow.jpg" width="800px" />
+
+</Layout>
+
+---
+
+<LocalImage src="images/control-system.png" width="800px" />
+
+---
+
+<Layout>
+
+## 4. Temporal decoupling
+
+- Fast or slow workflows
+- You might build a copy of a workflow engine
+- Good reason to start using sagas
+
+</Layout>
+
+---
+
+<Layout>
+
+## 5. Distant failures
+
+- How to notify user when event handling fails?
+- Can we resolve them _through support_?
+- All UX issues are business issues
+- At-least-once and idempotency
+
+</Layout>
 
 ---
 
@@ -184,17 +234,27 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 ---
 
-## Need for observability
+<Layout>
 
-- Events have to arrive eventually
-- Did any events come recently?
-- Metrics on event processing and queue pressure
+## Queues are not the answer
+
+- Processing speed
+- Parallelization
+- Retries and error handling
+
+Think about:
+
+- Message streams (e.g. Kafka)
+- Poll model for recovery
+
+</Layout>
 
 ---
 
 ## Data requirements
 
 - Event was received, but does it contain enough data?
+- Are API calls needed to fetch remaining data?
 
 <CodeSurfer>
 
@@ -218,16 +278,50 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 <Layout>
 
-## Event design, versioning, granularity, domain leaking
+## Why "fat" events?
 
-- Events are an API, design accordingly
+- Less processing time
+- Less pressure on original service
+
+Keep in mind:
+
+- GDPR, security issues
+
+</Layout>
+
+---
+
+## Sagas
+
+<LocalImage src="images/Create_Order_Saga.png" width="1400px" />
+
+(from [microservices.io](https://microservices.io/patterns/data/saga.html))
+
+---
+
+<Layout>
+
+## Events
+
+- Events _are_ your API, design accordingly
 - Centralized documentation and repository
-- Version like database
+- Versioning
 - Granularity: CRUD or hyper detailed
   - `UserCreated`, `UserBanned`, `UserUnbanned`, `UserBlocked`
   - `UserCreated`, `UserModified`, `UserDeleted`
 
 </Layout>
+
+---
+
+## Options
+
+1. Sync communication
+2. Events (fire and forget)
+   - Message streams
+3. Events choreograpy
+4. Centralized process manager
+5. BFFs
 
 ---
 
@@ -244,15 +338,7 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 ---
 
-<blockquote className="twitter-tweet">
-  <p lang="en" dir="ltr">
-    Debugging is like being the detective in a crime movie where you are also
-    the murderer.
-  </p>
-  &mdash; Filipe Fortes (@fortes) <a href="https://twitter.com/fortes/status/399339918213652480?ref_src=twsrc%5Etfw">November 10, 2013</a>
-</blockquote>
-
----
+<Layout>
 
 <blockquote className="twitter-tweet">
   <p lang="en" dir="ltr">
@@ -262,45 +348,7 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
   &mdash; Honestly Black Lives Matter (@honest_update) <a href="https://twitter.com/honest_update/status/651897353889259520?ref_src=twsrc%5Etfw">October 7, 2015</a>
 </blockquote>
 
----
-
-## Accidental complexity
-
-- Splitting systems does not remove the need for their interaction
-- Required interactions become more complex
-- Optional interactions complicate UX
-
----
-
-## Service boundaries
-
-<LocalImage src="images/service-boundary-1.png" height="60%" />
-
----
-
-## Service boundaries
-
-<LocalImage src="images/service-boundary-2.png" height="60%" />
-
----
-
-## Service boundaries
-
-<LocalImage src="images/service-boundary-3.png" height="60%" />
-
----
-
-## Service boundaries
-
-<LocalImage src="images/service-boundary-4.png" height="60%" />
-
----
-
-## Special ring of pain
-
-- Optional features (plans, opt-in)
-- Features implemented in multiple services
-- Addon based architecture
+</Layout>
 
 ---
 
@@ -318,18 +366,6 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 ---
 
-## Holistic view of the system
-
-- Events decouple systems
-- Documenting event usage becomes hard (BPMN)
-- Observability and metrics become harder
-
----
-
-<LocalImage src="images/control-system.png" width="800px" />
-
----
-
 # Data access
 
 ---
@@ -338,16 +374,24 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 - Querying data inside service is simple
 - Filtering, sorting, pagination across services is harder
+- We really like joining data
+  - Are those even relational databases?
 
 ---
 
 ## Types of reads
 
 - Querying data from external endpoint
+  - For UI, reports, public API
 - Checking data as a part of the process
+  - Validation, verification
 - Composing data as a part of the process
+  - Putting enough information into archive for easy lookup
+  - E.g. address at the point of purchase
 
 ---
+
+<Layout>
 
 ## Can I use events for reading?
 
@@ -355,11 +399,100 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 - They need to be obtained on demand
 - We shouldn't duplicate domain logic
 
+Solve instead with:
+
+- Data replication e.g. Debezium
+- Data sync microservice
+
+</Layout>
+
 ---
 
 ## Who owns data?
 
-- UI composition strategy affects this
+- Static data/metadata
+  - VAT rules, countries, timezones, domain specific constant data
+- Master data
+  - Data commonly used across microservices
+- Lookup data
+  - From one service to another
+
+---
+
+## Static data/metadata
+
+1. Ship with the app as a package (Nuget, npm, gem)
+2. Data management microservice (cron update)
+
+---
+
+## Master data (reference data)
+
+- Often changing data that is used in various services
+- Need to have a canonical data owner
+- Create caches next to the services that need them
+  - Sync via events
+  - Sync via cron job
+  - Anti-corruption layer to assure interesting data stays there
+
+---
+
+## What about JOINs?
+
+- Yeah, what about them?
+- Do it:
+  1. in-app
+  2. in API Gateway
+  3. in a dedicated data lake/custom db
+
+<blockquote>
+  Fetch customers 21-40 which have outstanding orders sorted by last order sent.
+</blockquote>
+
+---
+
+## Could vs Should
+
+- You **could** `JOIN` in DB
+- Is this **critical** business functionality?
+
+---
+
+## Accidental complexity
+
+- Splitting systems does not remove the need for their interaction
+- Required interactions become more complex
+- Optional interactions complicate UX
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-1.png" height="80%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-2.png" height="80%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-3.png" height="80%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-4.png" height="80%" />
+
+---
+
+## Actual architecture
+
+<LocalImage src="images/service-boundary-5.png" height="80%" />
 
 ---
 
@@ -367,6 +500,23 @@ The microservice architecture enables the rapid, frequent and reliable delivery 
 
 - Modeling distributed system is hard
 - Use pain points to guide implementation and design
+- Design and document events
+
+---
+
+<Layout>
+
+## What's next?
+
+- Testing...
+
+<img
+  style={{ marginTop: "1em" }}
+  src="https://media.giphy.com/media/WodKaNr3eh7FudzZVb/giphy.gif"
+  role="presentational"
+/>
+
+</Layout>
 
 ---
 
