@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "mdx-deck deck.mdx",
+    "build": "mdx-deck build deck.mdx && yarn build:statics",
+    "test": "echo \"there are no tests\"",
+    "build:statics": "cp -a static/. public"
+  },
+  "devDependencies": {
+    "code-surfer": "3.1.0",
+    "mdx-deck": "3.0.13"
+  },
+  "name": "presentation"
+}

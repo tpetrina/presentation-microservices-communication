@@ -1,0 +1,381 @@
+import { CodeSurfer, CodeSurferColumns, Step } from "code-surfer";
+import { github, vsDark, nightOwl } from "@code-surfer/themes";
+import Layout from "./src/Layout";
+import LocalImage from "./src/LocalImage";
+
+export const theme = nightOwl;
+
+<Layout>
+
+# Information patterns for microservice architecture
+
+Toni Petrina <br/>
+Update Conference 2021, Prague
+
+</Layout>
+
+---
+
+## Agenda
+
+<Layout style={{alignSelf: 'start'}}>
+
+- What changed with microservices?
+- How do we switch from requests to events?
+- Where is our data?
+- Recap
+
+</Layout>
+
+---
+
+## What this talk is not about?
+
+- Introduction to microservices
+- Arguing for or against microservices
+
+---
+
+<CodeSurfer>
+
+```js title="A procedural mindset"
+function (model: CreateUserModel) {
+    // first we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // user has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+
+    // then we connect it to our external CRM used for tracking
+    crm.connectUser(user.id, model);
+
+    // don't forget to send welcome or confirmation email
+    mail.sendConfirmEmail(user.email);
+
+    // set-up for compaign
+    campaign.setNewUser(user.id, new Date());
+}
+```
+
+</CodeSurfer>
+
+---
+
+<Layout>
+
+## Simple approach, complex outcomes
+
+- Transactions on system boundary
+  - Everything happens at once
+  - Coupling => system is consistent
+- Rouge component can bring down the system
+- All components share same availability
+- Procedure can be as complex as possible, all data is available
+
+</Layout>
+
+---
+
+## SQL schema...and probably code
+
+<LocalImage src="sql.png" />
+
+---
+
+## Some definitions
+
+<Layout style={{fontSize: '0.6em'}}>
+
+Microservices - also known as the microservice architecture - is an architectural style that structures an application as a collection of services that are
+
+- Highly maintainable and testable
+- Loosely coupled
+- Independently deployable
+- Organized around business capabilities
+- Owned by a small team
+
+The microservice architecture enables the rapid, frequent and reliable delivery of large, complex applications. It also enables an organization to evolve its technology stack.
+
+(from [microservices.io](https://microservices.io))
+
+</Layout>
+
+---
+
+## Let's start with data...
+
+- Data is owned by a service
+- Well-defined API on the boundary
+  - This includes RPC/REST API, events published, consumed, ETL
+- Sharing schemas, not types
+- [Data on the Outside vs. Data on the Inside, Pat Helland](https://queue.acm.org/detail.cfm?id=3415014)
+
+---
+
+## Two problems
+
+1. How do we _perform_ actions when components are distributed?
+2. How do we _get_ data out of distributed systems?
+
+---
+
+## Within service
+
+<LocalImage src="images/monolith.png" width="800px" />
+
+---
+
+## Request architecture
+
+<LocalImage src="images/request-driven.png" width="800px" />
+
+---
+
+## Issues
+
+- What if one of the services is down?
+- Required vs optional
+- Latency increases with number of components
+- Orchestration is valid reason for sync communication
+
+---
+
+## Request architecture
+
+<LocalImage src="images/request-driven-error.png" width="800px" />
+
+---
+
+## Events as a solution
+
+<LocalImage src="images/event-driven.png" width="800px" />
+
+---
+
+## Events come at a cost
+
+- Eventual consistency
+- Thundering herd and backpressure
+- Need for observability
+- Data requirements
+- Event design, versioning, granularity, domain leaking
+
+---
+
+## Eventual consistency
+
+- "User created, but can't login"
+- Data changed, but services are slow to catch-up
+- We can write to read model in the same transaction
+
+---
+
+## Thundering herd and backpressure
+
+- Subscribers must handle the load from producer
+  - Could you handle Twitter load on your service in real time?
+- [Thundering herds](https://en.wikipedia.org/wiki/Thundering_herd_problem)
+
+---
+
+## Message queue in front of each service
+
+<LocalImage src="images/event-driven-queue.png" width="800px" />
+
+---
+
+## Need for observability
+
+- Events have to arrive eventually
+- Did any events come recently?
+- Metrics on event processing and queue pressure
+
+---
+
+## Data requirements
+
+- Event was received, but does it contain enough data?
+
+<CodeSurfer>
+
+```json
+{
+  "user_id": "baadf00d"
+}
+```
+
+```json
+{
+  "user_id": "baadf00d",
+  "email": "user@example.com",
+  "organization_id": "1"
+}
+```
+
+</CodeSurfer>
+
+---
+
+<Layout>
+
+## Event design, versioning, granularity, domain leaking
+
+- Events are an API, design accordingly
+- Centralized documentation and repository
+- Version like database
+- Granularity: CRUD or hyper detailed
+  - `UserCreated`, `UserBanned`, `UserUnbanned`, `UserBlocked`
+  - `UserCreated`, `UserModified`, `UserDeleted`
+
+</Layout>
+
+---
+
+## Anti-patterns
+
+- Chatty events or chain events
+  - Essential workflows are implicit and hard to debug
+- Coupling services with complex choreograpy
+  - Details might be lost, easy to break others, hard to roll out fixes
+- Sagas for everything
+  - Logic leaks out into API Gateway or other unknown services
+- Domain leaking
+  - Prefer losing context when receiving events
+
+---
+
+<blockquote className="twitter-tweet">
+  <p lang="en" dir="ltr">
+    Debugging is like being the detective in a crime movie where you are also
+    the murderer.
+  </p>
+  &mdash; Filipe Fortes (@fortes) <a href="https://twitter.com/fortes/status/399339918213652480?ref_src=twsrc%5Etfw">November 10, 2013</a>
+</blockquote>
+
+---
+
+<blockquote className="twitter-tweet">
+  <p lang="en" dir="ltr">
+    We replaced our monolith with micro services so that every outage could be
+    more like a murder mystery.
+  </p>
+  &mdash; Honestly Black Lives Matter (@honest_update) <a href="https://twitter.com/honest_update/status/651897353889259520?ref_src=twsrc%5Etfw">October 7, 2015</a>
+</blockquote>
+
+---
+
+## Accidental complexity
+
+- Splitting systems does not remove the need for their interaction
+- Required interactions become more complex
+- Optional interactions complicate UX
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-1.png" height="60%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-2.png" height="60%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-3.png" height="60%" />
+
+---
+
+## Service boundaries
+
+<LocalImage src="images/service-boundary-4.png" height="60%" />
+
+---
+
+## Special ring of pain
+
+- Optional features (plans, opt-in)
+- Features implemented in multiple services
+- Addon based architecture
+
+---
+
+<Layout>
+
+<blockquote>
+  <p>
+    First Law of Distributed Object Design: "don't distribute your objects".
+  </p>
+  &mdash; Martin Fowler &nbsp;
+  <LocalImage src="mf.jpg" width="100px" />
+</blockquote>
+
+</Layout>
+
+---
+
+## Holistic view of the system
+
+- Events decouple systems
+- Documenting event usage becomes hard (BPMN)
+- Observability and metrics become harder
+
+---
+
+<LocalImage src="images/control-system.png" width="800px" />
+
+---
+
+# Data access
+
+---
+
+## What about queries?
+
+- Querying data inside service is simple
+- Filtering, sorting, pagination across services is harder
+
+---
+
+## Types of reads
+
+- Querying data from external endpoint
+- Checking data as a part of the process
+- Composing data as a part of the process
+
+---
+
+## Can I use events for reading?
+
+- They need to cover all state changes
+- They need to be obtained on demand
+- We shouldn't duplicate domain logic
+
+---
+
+## Who owns data?
+
+- UI composition strategy affects this
+
+---
+
+## Recap
+
+- Modeling distributed system is hard
+- Use pain points to guide implementation and design
+
+---
+
+<Layout style={{ alignSelf: 'start' }}>
+
+# Thank you!
+
+Toni Petrina <br/>
+twitter.com/tonipetrina1 <br/>
+github.com/tpetrina
+
+</Layout>
