@@ -2,6 +2,7 @@ import { CodeSurfer, CodeSurferColumns, Step } from "code-surfer";
 import { github, vsDark, nightOwl } from "@code-surfer/themes";
 import Layout from "./src/Layout";
 import LocalImage from "./src/LocalImage";
+import './main.css';
 
 export const theme = nightOwl;
 
@@ -10,19 +11,21 @@ export const theme = nightOwl;
 # Information patterns for microservice architecture
 
 Toni Petrina <br/>
+Lead SRE <br/>
 Visma e-conomic <br/>
-Update Conference 2021, Prague
+
+<span style={{ color: "" }}>SDD Conf 2024, London</span>
 
 </Layout>
 
 ---
 
-## Agenda
-
 <Layout style={{alignSelf: 'start'}}>
 
+## Agenda
+
 - What changed with microservices?
-- How do we switch from requests to events?
+- REST, eventual consistency and actors
 - Where is our data?
 - Recap
 
@@ -58,20 +61,87 @@ function (model: CreateUserModel) {
 }
 ```
 
-```diff 2:6 subtitle="Original requirement"
+</CodeSurfer>
+
+---
+
+<CodeSurfer>
+
+```js title="Original requirement"
+function (model: CreateUserModel) {
+    // first we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // user has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+}
+```
+
+</CodeSurfer>
+
+---
+
+<CodeSurfer>
+
+```js title="CRM integration added"
+function (model: CreateUserModel) {
+    // first we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // user has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+
+    // then we connect it to our external CRM used for tracking
+    crm.connectUser(user.id, model);
+}
 
 ```
 
-```diff 8:9 subtitle="CRM integration added"
+</CodeSurfer>
 
+---
+
+<CodeSurfer>
+
+```js title="New feature: confirmation email"
+function (model: CreateUserModel) {
+    // first we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // user has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+
+    // then we connect it to our external CRM used for tracking
+    crm.connectUser(user.id, model);
+
+    // don't forget to send welcome or confirmation email
+    mail.sendConfirmEmail(user.email);
+}
 ```
 
-```diff 11:12 subtitle="New feature"
+</CodeSurfer>
 
-```
+---
 
-```diff 14:15 subtitle="New feature"
+<CodeSurfer>
 
+```js title="New feature: campaign tracker"
+function (model: CreateUserModel) {
+    // first we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // user has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+
+    // then we connect it to our external CRM used for tracking
+    crm.connectUser(user.id, model);
+
+    // don't forget to send welcome or confirmation email
+    mail.sendConfirmEmail(user.email);
+
+    // set-up for compaign
+    campaign.setNewUser(user.id, new Date());
+}
 ```
 
 </CodeSurfer>
@@ -80,14 +150,15 @@ function (model: CreateUserModel) {
 
 <Layout>
 
-## Simple approach, complex outcomes
+# Simple approach, complex outcomes
 
 - Transactions on system boundary
-  - Everything happens at once
-  - Coupling => system is consistent
-- Rouge component can bring down the system
-- All components share same availability
-- Procedure can be as complex as possible, all data is available
+  - Everything happens at once - all or nothing
+  - High coupling => system is in a consistent state
+- <span style={{ color: "green" }}>&#9650;</span> All components share same availability
+- <span style={{ color: "green" }}>&#9650;</span> Procedure can be as complex as
+  possible, all data is available
+- 🔻 Rouge component can bring down the system
 
 </Layout>
 
@@ -99,18 +170,25 @@ function (model: CreateUserModel) {
 
 ---
 
-## Some definitions
+<Layout>
 
-<Layout style={{fontSize: '0.6em'}}>
+# From monolith to services
 
-Microservices [...] are
+The goal is to transform the monolithic codebase into a microservice one. <br/>
+How does that change the above code?
+
+</Layout>
+
+---
+
+# Microservices are:
+
+<Layout>
 
 - Highly maintainable and testable
-- <span style={{ color: "#e32636" }}>Loosely coupled</span>
+- <span style={{ color: "green" }}>Loosely coupled</span>
 - Independently deployable
-- <span style={{ color: "#e32636" }}>
-    Organized around business capabilities
-  </span>
+- <span style={{ color: "green" }}>Organized around business capabilities</span>
 - Owned by a small team
 
 (from [microservices.io](https://microservices.io))
@@ -119,44 +197,122 @@ Microservices [...] are
 
 ---
 
-## Two problems
+# Two problems
 
 1. How do we _perform_ actions when components are distributed?
 2. How do we _get_ data out of distributed systems?
 
 ---
 
-## Within service
+<Layout>
+
+# Performing actions
+
+- When a user initiates action
+  - When is it done?
+  - How to handle failure?
+
+</Layout>
+
+---
+
+# Within a service
 
 <LocalImage src="images/monolith.png" width="800px" />
 
 ---
 
-## Request architecture
+# Sync architecture (request/response)
 
 <LocalImage src="images/request-driven.png" width="800px" />
 
 ---
 
-## Issues
+# Single subsystem failure fails the request
 
 <LocalImage src="images/request-driven-error.png" width="800px" />
 
 ---
 
-## Events as a solution
+<Layout>
 
-<LocalImage src="images/event-driven.png" width="800px" />
+# Transactional boundary does not include external services
 
----
+- We can always roll-back changes made in the local db
+- Use Outbox pattern within transaction for external services
+- E.g. sending an e-mail mid-operation which gets rolled back
 
-<blockquote>Always emit events with Outbox pattern</blockquote>
+</Layout>
 
 ---
 
 <Layout>
 
-## 1. Eventual consistency
+# Transactions over multiple systems
+
+- Distributed Transactions
+- Two-phase commit
+- Saga
+
+</Layout>
+
+---
+
+## Events decouple subsystems and failures
+
+<LocalImage src="images/event-driven.png" width="800px" />
+
+---
+
+<Layout>
+
+# Always emit events with Outbox pattern
+
+Outbox pattern allows for:
+
+- Persist events before sending them
+- If transactional, simulates transaction with external services
+- Allows retries and observability
+- Ensures at least once deliverability
+
+</Layout>
+
+---
+
+<CodeSurfer>
+
+```js title="Event code"
+function (model: CreateUserModel) {
+    // First we create a new user in our main DB
+    user = db.insertUser(model);
+
+    // User has accepted to join organization
+    db.addToOrganization(user, model.organizationId);
+
+    // Add event to Outbox and process it later
+    outbox.AddEvent(new UserCreatedEvent(user.Id));
+}
+```
+
+</CodeSurfer>
+
+---
+
+<Layout>
+
+# Events are not a panacea
+
+- Switching from request/response to events might yield some new issues
+- We knew that when the request finished, everything was "correct"
+- Events will be delivered...when?
+
+</Layout>
+
+---
+
+<Layout>
+
+# 1. Eventual consistency
 
 Issues:
 
@@ -167,7 +323,7 @@ Solve with:
 
 - Sync write to read model in the same transaction
 - Better UX (OK vs Accepted HTTP Status Code)
-- Learn to live with it
+- Learn to live with it - the world is eventually consistent
 
 </Layout>
 
@@ -175,11 +331,19 @@ Solve with:
 
 <Layout>
 
-## 2. Thundering herd and backpressure
+# 2. Thundering herd and backpressure
+
+<blockquote>
+  In computer science, the thundering herd problem occurs when a large number of
+  processes or threads waiting for an event are awoken when that event occurs,
+  but only one process is able to handle the event. When the processes wake up,
+  they will each try to handle the event, but only one will win. All processes
+  will compete for resources, possibly freezing the computer, until the herd is
+  calmed down again.[1]
+</blockquote>
 
 - Subscribers must handle the load from producer
   - Could you handle Twitter load on your service in real time?
-- [Thundering herds](https://en.wikipedia.org/wiki/Thundering_herd_problem)
 
 Solve with:
 
@@ -199,17 +363,37 @@ Solve with:
 
 ---
 
+<Layout>
+
+## 3. Observability
+
+Detect:
+
+- Events not being processed
+- Events being processed slowly
+
+Solve with:
+
+- Synthetic tests to ensure a "stream" of events to process
+
+</Layout>
+
+---
+
 <LocalImage src="images/control-system.png" width="800px" />
 
 ---
 
 <Layout>
 
-## 4. Temporal decoupling
+## 4. Temporal decoupling i.e. it is done when it is done
 
-- Fast or slow workflows
+- Not all operations "complete" at the same time. Depends on number of listeners and scale on those subsystems
+  - The slowest sub-operation slows down the entire operation
 - You might build a copy of a workflow engine
-- Good reason to start using sagas
+- Good reason to start using sagas in case of failures
+  - Or at least compensating operations
+  - Invest in customer support
 
 </Layout>
 
@@ -220,9 +404,11 @@ Solve with:
 ## 5. Distant failures
 
 - How to notify user when event handling fails?
+  - Can user even do anything about them?
 - Can we resolve them _through support_?
-- All UX issues are business issues
-- At-least-once and idempotency
+- Need to show "ongoing" operations
+- All UX issues become business issues
+- At-least-once and idempotency ensure trivial retry without duplicating stuff
 
 </Layout>
 
@@ -245,7 +431,7 @@ Solve with:
 Think about:
 
 - Message streams (e.g. Kafka)
-- Poll model for recovery
+- Poll model for recovery (e.g. Atom feeds)
 
 </Layout>
 
@@ -280,6 +466,7 @@ Think about:
 
 ## Why "fat" events?
 
+- Event Carried State Transfer
 - Less processing time
 - Less pressure on original service
 
@@ -291,7 +478,23 @@ Keep in mind:
 
 ---
 
+<LocalImage src="images/Slim events require more communication.drawio.png" width="800px" />
+
+---
+
+<Layout>
+
 ## Sagas
+
+- Coordinate steps across multiple services
+- Rollback steps on failure
+- Requires knowing all steps
+- Requires knowing compensating action for all steps
+- Two types: choreograpy and orchestration
+
+</Layout>
+
+---
 
 <LocalImage src="images/Create_Order_Saga.png" width="1400px" />
 
@@ -301,7 +504,7 @@ Keep in mind:
 
 <Layout>
 
-## Events
+## Events and design
 
 - Events _are_ your API, design accordingly
 - Centralized documentation and repository
@@ -314,10 +517,10 @@ Keep in mind:
 
 ---
 
-## Options
+## Options when performing actions across services
 
-1. Sync communication
-2. Events (fire and forget)
+1. Sync communication (REST, gRPC)
+2. Async i.e. events (fire and forget)
    - Message streams
 3. Events choreograpy
 4. Centralized process manager
@@ -325,7 +528,7 @@ Keep in mind:
 
 ---
 
-## Anti-patterns
+## Anti-patterns when using events
 
 - Chatty events or chain events
   - Essential workflows are implicit and hard to debug
@@ -340,13 +543,7 @@ Keep in mind:
 
 <Layout>
 
-<blockquote className="twitter-tweet">
-  <p lang="en" dir="ltr">
-    We replaced our monolith with micro services so that every outage could be
-    more like a murder mystery.
-  </p>
-  &mdash; Honestly Black Lives Matter (@honest_update) <a href="https://twitter.com/honest_update/status/651897353889259520?ref_src=twsrc%5Etfw">October 7, 2015</a>
-</blockquote>
+<LocalImage src="images/tweet_651897353889259520_20240424_113650_via_10015_io.png" width="900px" />
 
 </Layout>
 
@@ -396,10 +593,11 @@ Keep in mind:
 ## Can I use events for reading?
 
 - They need to cover all state changes
-- They need to be obtained on demand
+  - You should be able to reconstruct a valid invariant
 - We shouldn't duplicate domain logic
+  - How to interpret events
 
-Solve instead with:
+Alternatives:
 
 - Data replication e.g. Debezium
 - Data sync microservice
@@ -410,9 +608,9 @@ Solve instead with:
 
 ## Who owns data?
 
-- Static data/metadata
+- Static data/metadata (rarely changing, external data)
   - VAT rules, countries, timezones, domain specific constant data
-- Master data
+- Reference (master) data (usually business specific and highly important)
   - Data commonly used across microservices
 - Lookup data
   - From one service to another
@@ -421,12 +619,21 @@ Solve instead with:
 
 ## Static data/metadata
 
-1. Ship with the app as a package (Nuget, npm, gem)
-2. Data management microservice (cron update)
+- Ship with the app as a package (Nuget, npm, gem)
+- Data management microservice (cron update)
 
 ---
 
-## Master data (reference data)
+<Layout>
+
+<LocalImage src="images/Sync service.drawio.png" width="900px" />
+
+</Layout>
+
+
+---
+
+## Reference data (master data)
 
 - Often changing data that is used in various services
 - Need to have a canonical data owner
@@ -439,7 +646,8 @@ Solve instead with:
 
 ## What about JOINs?
 
-- Yeah, what about them?
+- Filtering, Pagination, Search
+- JOIN across servers is impossible
 - Do it:
   1. in-app
   2. in API Gateway
@@ -466,25 +674,25 @@ Solve instead with:
 
 ---
 
-## Service boundaries
+## Service boundaries within a monolithic service
 
 <LocalImage src="images/service-boundary-1.png" height="80%" />
 
 ---
 
-## Service boundaries
+## Service boundaries in modules or microservices
 
 <LocalImage src="images/service-boundary-2.png" height="80%" />
 
 ---
 
-## Service boundaries
+## Service boundaries make operations explicit
 
 <LocalImage src="images/service-boundary-3.png" height="80%" />
 
 ---
 
-## Service boundaries
+## Proper modules and their dependencies
 
 <LocalImage src="images/service-boundary-4.png" height="80%" />
 
@@ -504,14 +712,14 @@ Solve instead with:
 
 ---
 
-<Layout>
+<Layout style={{ gap: '1rem' }}>
 
 ## What's next?
 
 - Testing...
 
 <img
-  style={{ marginTop: "1em" }}
+  style={{ marginTop: "0", height: '50vh' }}
   src="https://media.giphy.com/media/WodKaNr3eh7FudzZVb/giphy.gif"
   role="presentational"
 />

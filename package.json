@@ -2,6 +2,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "dev": "NODE_OPTIONS=--openssl-legacy-provider && mdx-deck deck.mdx",
     "start": "mdx-deck deck.mdx",
     "build": "mdx-deck build deck.mdx && yarn build:statics",
     "test": "echo \"there are no tests\"",
